@@ -126,12 +126,22 @@ export default function PhotoUploadAndGenerate() {
       const formData = new FormData();
       formData.append("photo", selectedFile);
 
-      const uploadResponse = await fetch("/api/upload", {
+      // Add sessionId if we have story data, otherwise let backend generate one
+      if (storyResult) {
+        // We have story data, this is the normal flow
+        formData.append("sessionId", "existing-session");
+      }
+
+      console.log("🔄 Starting upload and PDF generation process");
+      console.log("📝 Has story data:", !!storyResult);
+
+      const uploadResponse = await fetch("http://localhost:3001/api/upload", {
         method: "POST",
         body: formData,
       });
 
       const uploadResult = await uploadResponse.json();
+      console.log("📸 Upload result:", uploadResult);
 
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || "Upload failed");
@@ -149,45 +159,110 @@ export default function PhotoUploadAndGenerate() {
       toast.success("Photo uploaded successfully!");
       setUploading(false);
 
-      // Step 2: Generate character images
+      // Step 2: Skip actual image generation for now
       setGenerating(true);
+      console.log("⏭️ Skipping image generation - focusing on PDF");
 
-      const generateResponse = await fetch("/api/character/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sessionId: uploadResult.data.sessionId,
-        }),
-      });
+      // Create 8 mock chapters and characters for PDF (always multi-chapter format)
+      const defaultChapterStories = [
+        `${
+          childData?.childName || "Our hero"
+        } discovers a magical door hidden behind the old oak tree in their backyard. As they push it open, a world of wonder and adventure awaits them on the other side.`,
+        `Stepping through the magical door, ${
+          childData?.childName || "Our hero"
+        } finds themselves in an enchanted forest where the trees whisper secrets and flowers glow with their own light.`,
+        `${
+          childData?.childName || "Our hero"
+        } meets a wise talking owl who becomes their guide. The owl tells them about an ancient treasure that can only be found by someone with a pure heart.`,
+        `Together with their new friend, ${
+          childData?.childName || "Our hero"
+        } crosses a sparkling river on the back of a friendly dragon who loves to help young adventurers on their quests.`,
+        `${
+          childData?.childName || "Our hero"
+        } discovers a hidden cave filled with glittering crystals. Each crystal holds a memory of courage from children who came before them.`,
+        `In a beautiful meadow, ${
+          childData?.childName || "Our hero"
+        } helps a family of lost rabbits find their way home, learning that kindness is the greatest magic of all.`,
+        `${
+          childData?.childName || "Our hero"
+        } faces their biggest challenge yet - crossing a bridge guarded by a lonely giant who just wants a friend to talk to.`,
+        `With the treasure in hand and new friends by their side, ${
+          childData?.childName || "Our hero"
+        } returns home, knowing that the greatest adventure is the one that lives in their heart.`,
+      ];
 
-      const generateResult = await generateResponse.json();
+      const mockImages = Array.from({ length: 8 }, (_, index) => ({
+        chapterNumber: index + 1,
+        filename: `mock_chapter_${index + 1}.jpg`,
+        url: uploadResult.data.imageUrl, // Use uploaded image for all characters
+        prompt: `Character ${index + 1} in scene for chapter ${index + 1}`,
+        fullChapterText:
+          storyResult?.chapters?.[index]?.chapterText ||
+          storyResult?.chapters?.[index]?.fullChapterText ||
+          defaultChapterStories[index],
+      }));
 
-      if (!generateResult.success) {
+      setGeneratedImages(mockImages);
+      toast.success("Preparing 8 character images for storybook!");
+
+      // Step 2.5: Call character generation API to set up backend session with all chapters
+      console.log("🎨 Setting up backend session with character data...");
+      console.log("📚 Existing story data:", storyResult);
+
+      const characterResponse = await fetch(
+        "http://localhost:3001/api/character/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: uploadResult.data.sessionId,
+            generateMultiple: true,
+            existingStory: storyResult, // Pass the existing story data
+            existingAnalysis: analysisResult, // Pass the existing analysis data
+          }),
+        }
+      );
+      const characterResult = await characterResponse.json();
+      console.log("🎨 Character generation result:", characterResult);
+
+      if (!characterResult.success) {
         throw new Error(
-          generateResult.error || "Failed to generate character images"
+          characterResult.error || "Failed to set up character data"
         );
       }
 
-      setGeneratedImages(generateResult.data.images);
-      toast.success("Character images generated successfully!");
       setGenerating(false);
 
       // Step 3: Generate PDF
       setGeneratingPDF(true);
 
-      const pdfResponse = await fetch("/api/pdf/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sessionId: uploadResult.data.sessionId,
-        }),
-      });
+      console.log(
+        "📚 Generating PDF with sessionId:",
+        uploadResult.data.sessionId
+      );
+      console.log(
+        "📚 Multi-chapter mode:",
+        (storyResult?.chapters?.length || 0) > 1
+      );
+
+      const pdfResponse = await fetch(
+        "http://localhost:3001/api/pdf/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: uploadResult.data.sessionId,
+            multiChapter: true, // Always use multi-chapter mode
+          }),
+        }
+      );
 
       const pdfResult = await pdfResponse.json();
+      console.log("📚 PDF result:", pdfResult);
 
       if (!pdfResult.success) {
         throw new Error(pdfResult.error || "Failed to generate PDF");
@@ -220,7 +295,7 @@ export default function PhotoUploadAndGenerate() {
 
     try {
       const response = await fetch(
-        `/api/pdf/download/${uploadedPhoto.sessionId}`
+        `http://localhost:3001/api/pdf/download/${uploadedPhoto.sessionId}`
       );
       if (response.ok) {
         const blob = await response.blob();
@@ -246,6 +321,38 @@ export default function PhotoUploadAndGenerate() {
     window.location.href = "/";
   };
 
+  // Debug function to check session data
+  const handleDebugSession = async () => {
+    if (!uploadedPhoto?.sessionId) {
+      toast.error("No session ID available to debug");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/debug/session/${uploadedPhoto.sessionId}`
+      );
+      const result = await response.json();
+
+      console.log("🔍 Debug session data:", result);
+
+      if (result.success) {
+        toast.success("Debug data logged to console");
+        alert(`Session Debug Info:
+- Has Story Result: ${result.data.hasStoryResult}
+- Story Chapters Count: ${result.data.storyChaptersCount}
+- Generated Images Count: ${result.data.generatedImagesCount}
+
+Check console for detailed info.`);
+      } else {
+        toast.error(result.error || "Failed to get debug data");
+      }
+    } catch (error) {
+      console.error("Debug error:", error);
+      toast.error("Failed to debug session");
+    }
+  };
+
   const isProcessing = uploading || generating || generatingPDF;
 
   return (
@@ -262,8 +369,8 @@ export default function PhotoUploadAndGenerate() {
           Upload Photo & Generate Storybook
         </h2>
         <p className="text-gray-600">
-          Upload {childData?.childName}'s photo to create a complete
-          personalized storybook
+          Upload {childData?.childName || "your child"}'s photo to create a{" "}
+          {storyResult ? "complete personalized" : "beautiful"} storybook
         </p>
       </div>
       {/* Enhanced Story Summary with Character Prompts */}
@@ -279,13 +386,13 @@ export default function PhotoUploadAndGenerate() {
                 <strong>Child:</strong> {childData?.childName}
               </div>
               <div>
-                <strong>Theme:</strong> {childData?.genre}
+                <strong>Age:</strong> {childData?.age} years old
               </div>
               <div>
-                <strong>Interests:</strong> {childData?.interests}
+                <strong>Gender:</strong> {childData?.gender}
               </div>
               <div>
-                <strong>Story Theme:</strong> {childData?.storyTheme}
+                <strong>Language:</strong> {childData?.language}
               </div>
             </div>
 
@@ -385,7 +492,25 @@ export default function PhotoUploadAndGenerate() {
               </div>
             )}
         </>
-      )}{" "}
+      )}
+
+      {/* Debug Section - Show after upload for testing */}
+      {uploadedPhoto && (
+        <div className="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            🔧 Debug Tools
+          </h3>
+          <Button
+            onClick={handleDebugSession}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            Check Session Data
+          </Button>
+        </div>
+      )}
+
       {!showResults ? (
         <>
           {/* File Upload Section */}
@@ -479,15 +604,15 @@ export default function PhotoUploadAndGenerate() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                 <h3 className="text-lg font-semibold text-purple-900 mb-2">
                   {uploading && "Uploading photo..."}
-                  {generating && "Generating character images..."}
-                  {generatingPDF && "Creating PDF storybook..."}
+                  {generating && "Preparing 8 character images..."}
+                  {generatingPDF && "Creating 8-chapter PDF storybook..."}
                 </h3>
                 <p className="text-purple-700">
                   {uploading && "Uploading your photo to our secure servers."}
                   {generating &&
-                    "Our AI is creating magical character illustrations."}
+                    "Preparing your character for 8 amazing chapters."}
                   {generatingPDF &&
-                    "Assembling your complete storybook with images."}
+                    "Assembling your complete 8-chapter storybook with character images."}
                 </p>
               </div>
             </div>
@@ -539,11 +664,11 @@ export default function PhotoUploadAndGenerate() {
               <Download className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-2xl font-bold text-green-900 mb-2">
-              🎉 Your Storybook is Ready!
+              🎉 Your 8-Chapter Storybook is Ready!
             </h3>
             <p className="text-green-700 mb-6">
-              Your personalized storybook with character images has been
-              generated successfully.
+              Your personalized storybook with 8 chapters and character images
+              has been generated successfully.
             </p>
 
             {/* Generated Images Preview */}

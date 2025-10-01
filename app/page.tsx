@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles, BookOpen, Wand2 } from 'lucide-react';
-import { useStoryStore, useStepNavigation } from '@/store/useStoryStore';
-import StoryForm from '@/components/steps/StoryForm';
-import PhotoUploadAndGenerate from '@/components/steps/PhotoUploadAndGenerate';
-import ProgressBar from '@/components/ui/ProgressBar';
-import StepIndicator from '@/components/ui/StepIndicator';
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Sparkles, BookOpen, Wand2 } from "lucide-react";
+import { useStoryStore, useStepNavigation } from "@/store/useStoryStore";
+import StoryForm from "@/components/steps/StoryForm";
+import PhotoUploadAndGenerate from "@/components/steps/PhotoUploadAndGenerate";
+import ProgressBar from "@/components/ui/ProgressBar";
+import StepIndicator from "@/components/ui/StepIndicator";
 
 const steps = [
-  { id: 'form', title: 'Story Details', icon: BookOpen },
-  { id: 'upload', title: 'Upload & Generate', icon: Wand2 },
+  { id: "form", title: "Story Details", icon: BookOpen },
+  { id: "upload", title: "Upload & Generate", icon: Wand2 },
 ];
 
 export default function HomePage() {
@@ -20,9 +20,9 @@ export default function HomePage() {
 
   const renderStep = () => {
     switch (currentStep) {
-      case 'form':
+      case "form":
         return <StoryForm />;
-      case 'upload':
+      case "upload":
         return <PhotoUploadAndGenerate />;
       default:
         return <StoryForm />;
@@ -43,9 +43,17 @@ export default function HomePage() {
                 AI Storybook Generator
               </h1>
             </div>
-            
+
             <div className="hidden md:block">
-              <StepIndicator steps={steps} currentStep={currentStep} />
+              <div className="flex items-center space-x-4">
+                <a
+                  href="/upload"
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium transition-colors"
+                >
+                  📤 Direct Upload
+                </a>
+                <StepIndicator steps={steps} currentStep={currentStep} />
+              </div>
             </div>
           </div>
         </div>
@@ -53,8 +61,8 @@ export default function HomePage() {
 
       {/* Progress Bar */}
       {progress && (
-        <ProgressBar 
-          progress={progress.percentage} 
+        <ProgressBar
+          progress={progress.percentage}
           message={progress.message}
           className="mx-4 mt-4"
         />
@@ -71,9 +79,7 @@ export default function HomePage() {
           className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden"
         >
           {/* Step Content */}
-          <div className="p-8">
-            {renderStep()}
-          </div>
+          <div className="p-8">{renderStep()}</div>
         </motion.div>
       </main>
 
@@ -81,6 +87,14 @@ export default function HomePage() {
       <footer className="mt-16 bg-white/50 backdrop-blur-sm border-t border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
+            <div className="mb-4">
+              <a
+                href="/upload"
+                className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+              >
+                📤 Quick Upload - Skip Story Creation
+              </a>
+            </div>
             <p className="text-sm">
               Creating magical stories with the power of AI ✨
             </p>
