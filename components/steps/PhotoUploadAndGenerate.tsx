@@ -39,6 +39,7 @@ export default function PhotoUploadAndGenerate() {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChapterCount, setSelectedChapterCount] = useState<number>(8); // Track selected chapter count
 
   // File handling
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -163,51 +164,61 @@ export default function PhotoUploadAndGenerate() {
       setGenerating(true);
       console.log("⏭️ Skipping image generation - focusing on PDF");
 
-      // Create 8 mock chapters and characters for PDF (always multi-chapter format)
-      const defaultChapterStories = [
-        `${
-          childData?.childName || "Our hero"
-        } discovers a magical door hidden behind the old oak tree in their backyard. As they push it open, a world of wonder and adventure awaits them on the other side.`,
-        `Stepping through the magical door, ${
-          childData?.childName || "Our hero"
-        } finds themselves in an enchanted forest where the trees whisper secrets and flowers glow with their own light.`,
-        `${
-          childData?.childName || "Our hero"
-        } meets a wise talking owl who becomes their guide. The owl tells them about an ancient treasure that can only be found by someone with a pure heart.`,
-        `Together with their new friend, ${
-          childData?.childName || "Our hero"
-        } crosses a sparkling river on the back of a friendly dragon who loves to help young adventurers on their quests.`,
-        `${
-          childData?.childName || "Our hero"
-        } discovers a hidden cave filled with glittering crystals. Each crystal holds a memory of courage from children who came before them.`,
-        `In a beautiful meadow, ${
-          childData?.childName || "Our hero"
-        } helps a family of lost rabbits find their way home, learning that kindness is the greatest magic of all.`,
-        `${
-          childData?.childName || "Our hero"
-        } faces their biggest challenge yet - crossing a bridge guarded by a lonely giant who just wants a friend to talk to.`,
-        `With the treasure in hand and new friends by their side, ${
-          childData?.childName || "Our hero"
-        } returns home, knowing that the greatest adventure is the one that lives in their heart.`,
-      ];
+      // Get selected chapter count from childData
+      const chapterCount = parseInt(childData?.chapterCount || "8");
+      setSelectedChapterCount(chapterCount);
+      console.log(`📖 Creating ${chapterCount} chapters as selected`);
 
-      const mockImages = Array.from({ length: 8 }, (_, index) => ({
-        chapterNumber: index + 1,
-        filename: `mock_chapter_${index + 1}.jpg`,
-        url: uploadResult.data.imageUrl, // Use uploaded image for all characters
-        prompt: `Character ${index + 1} in scene for chapter ${index + 1}`,
-        fullChapterText:
-          storyResult?.chapters?.[index]?.chapterText ||
-          storyResult?.chapters?.[index]?.fullChapterText ||
-          defaultChapterStories[index],
-      }));
+      // Create mock chapters and characters for PDF (based on selected count)
+      const generateDefaultChapterStories = (
+        name: string,
+        count: number
+      ): string[] => {
+        const baseStories = [
+          `${name} discovers a magical door hidden behind the old oak tree in their backyard. As they push it open, a world of wonder and adventure awaits them on the other side.`,
+          `Stepping through the magical door, ${name} finds themselves in an enchanted forest where the trees whisper secrets and flowers glow with their own light.`,
+          `${name} meets a wise talking owl who becomes their guide. The owl tells them about an ancient treasure that can only be found by someone with a pure heart.`,
+          `Together with their new friend, ${name} crosses a sparkling river on the back of a friendly dragon who loves to help young adventurers on their quests.`,
+          `${name} discovers a hidden cave filled with glittering crystals. Each crystal holds a memory of courage from children who came before them.`,
+          `In a beautiful meadow, ${name} helps a family of lost rabbits find their way home, learning that kindness is the greatest magic of all.`,
+          `${name} faces their biggest challenge yet - crossing a bridge guarded by a lonely giant who just wants a friend to talk to.`,
+          `With the treasure in hand and new friends by their side, ${name} returns home, knowing that the greatest adventure is the one that lives in their heart.`,
+        ];
 
-      setGeneratedImages(mockImages);
-      toast.success("Preparing 8 character images for storybook!");
+        // If we need fewer chapters, take the first N-1 and adjust the last one to be conclusive
+        if (count < baseStories.length) {
+          const selectedStories = baseStories.slice(0, count - 1);
+          selectedStories.push(
+            `With new wisdom and magical friends by their side, ${name} completes their adventure and returns home, knowing they can face any challenge with courage and kindness.`
+          );
+          return selectedStories;
+        }
+
+        // If we need exactly 8 or fewer, return as is
+        return baseStories.slice(0, count);
+      };
+
+      const defaultChapterStories = generateDefaultChapterStories(
+        childData?.childName || "Our hero",
+        chapterCount
+      );
 
       // Step 2.5: Call character generation API to set up backend session with all chapters
       console.log("🎨 Setting up backend session with character data...");
       console.log("📚 Existing story data:", storyResult);
+      console.log(
+        `🎯 Selected chapter count: ${chapterCount}, limiting story data...`
+      );
+
+      // Limit the story data to only the selected number of chapters
+      const limitedStoryResult = {
+        ...storyResult,
+        chapters: storyResult?.chapters?.slice(0, chapterCount) || [],
+      };
+
+      console.log(
+        `📚 Limited story chapters: ${limitedStoryResult.chapters.length}`
+      );
 
       const characterResponse = await fetch(
         "http://localhost:3001/api/character/generate",
@@ -219,7 +230,7 @@ export default function PhotoUploadAndGenerate() {
           body: JSON.stringify({
             sessionId: uploadResult.data.sessionId,
             generateMultiple: true,
-            existingStory: storyResult, // Pass the existing story data
+            existingStory: limitedStoryResult, // Pass limited story data
             existingAnalysis: analysisResult, // Pass the existing analysis data
           }),
         }
@@ -233,6 +244,18 @@ export default function PhotoUploadAndGenerate() {
         );
       }
 
+      // Use the actual generated images from the backend response
+      console.log(
+        "✅ Using real generated images from backend:",
+        characterResult.data.generatedImages
+      );
+      setGeneratedImages(characterResult.data.generatedImages || []);
+
+      const imageCount = characterResult.data.generatedImages?.length || 0;
+      toast.success(
+        `Successfully generated ${imageCount} AI character images!`
+      );
+
       setGenerating(false);
 
       // Step 3: Generate PDF
@@ -244,7 +267,7 @@ export default function PhotoUploadAndGenerate() {
       );
       console.log(
         "📚 Multi-chapter mode:",
-        (storyResult?.chapters?.length || 0) > 1
+        `${chapterCount} chapters selected`
       );
 
       const pdfResponse = await fetch(
@@ -604,15 +627,17 @@ Check console for detailed info.`);
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                 <h3 className="text-lg font-semibold text-purple-900 mb-2">
                   {uploading && "Uploading photo..."}
-                  {generating && "Preparing 8 character images..."}
-                  {generatingPDF && "Creating 8-chapter PDF storybook..."}
+                  {generating &&
+                    `Preparing ${selectedChapterCount} character images...`}
+                  {generatingPDF &&
+                    `Creating ${selectedChapterCount}-chapter PDF storybook...`}
                 </h3>
                 <p className="text-purple-700">
                   {uploading && "Uploading your photo to our secure servers."}
                   {generating &&
-                    "Preparing your character for 8 amazing chapters."}
+                    `Preparing your character for ${selectedChapterCount} amazing chapters.`}
                   {generatingPDF &&
-                    "Assembling your complete 8-chapter storybook with character images."}
+                    `Assembling your complete ${selectedChapterCount}-chapter storybook with character images.`}
                 </p>
               </div>
             </div>
@@ -664,11 +689,11 @@ Check console for detailed info.`);
               <Download className="w-8 h-8 text-white" />
             </div>
             <h3 className="text-2xl font-bold text-green-900 mb-2">
-              🎉 Your 8-Chapter Storybook is Ready!
+              🎉 Your {selectedChapterCount}-Chapter Storybook is Ready!
             </h3>
             <p className="text-green-700 mb-6">
-              Your personalized storybook with 8 chapters and character images
-              has been generated successfully.
+              Your personalized storybook with {selectedChapterCount} chapters
+              and character images has been generated successfully.
             </p>
 
             {/* Generated Images Preview */}

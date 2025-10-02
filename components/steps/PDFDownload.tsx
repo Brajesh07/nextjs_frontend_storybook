@@ -122,16 +122,16 @@ export default function PDFDownload() {
             </div>
 
             <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-600">Story Theme:</span>
+              <span className="text-gray-600">Number of Chapters:</span>
               <span className="font-medium text-gray-900">
-                {childData?.storyTheme}
+                {childData?.chapterCount || "8"} Chapters
               </span>
             </div>
 
             <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <span className="text-gray-600">Genre:</span>
+              <span className="text-gray-600">Language:</span>
               <span className="font-medium text-gray-900">
-                {childData?.genre}
+                {childData?.language || "English"}
               </span>
             </div>
 

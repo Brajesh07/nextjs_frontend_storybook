@@ -38,6 +38,7 @@ export default function StoryForm() {
     gender: childData?.gender || "",
     language: childData?.language || "",
     parentName: childData?.parentName || "",
+    chapterCount: childData?.chapterCount || "8", // Default to 8 chapters
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -80,6 +81,7 @@ export default function StoryForm() {
       gender: formData.gender as "boy" | "girl",
       language: formData.language,
       parentName: formData.parentName.trim(),
+      chapterCount: formData.chapterCount,
     };
 
     // Save child data to store
@@ -93,6 +95,7 @@ export default function StoryForm() {
         gender: childDataToSave.gender,
         language: childDataToSave.language,
         parentName: childDataToSave.parentName,
+        chapterCount: parseInt(childDataToSave.chapterCount || "8"),
       });
 
       // Move to next step only after successful story generation
@@ -213,6 +216,33 @@ export default function StoryForm() {
           </Select>
           {errors.language && (
             <p className="text-sm text-red-600 mt-1">{errors.language}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="chapterCount">Number of Chapters *</Label>
+          <Select
+            value={formData.chapterCount}
+            onValueChange={(value) => handleInputChange("chapterCount", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select number of chapters" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2">2 Chapters (Testing)</SelectItem>
+              <SelectItem value="3">3 Chapters</SelectItem>
+              <SelectItem value="4">4 Chapters</SelectItem>
+              <SelectItem value="5">5 Chapters</SelectItem>
+              <SelectItem value="6">6 Chapters</SelectItem>
+              <SelectItem value="8">8 Chapters (Default)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-gray-500 mt-1">
+            💡 <strong>Default:</strong> 8 chapters for full storybook
+            experience. Choose fewer only for testing to save API credits.
+          </p>
+          {errors.chapterCount && (
+            <p className="text-sm text-red-600 mt-1">{errors.chapterCount}</p>
           )}
         </div>
 

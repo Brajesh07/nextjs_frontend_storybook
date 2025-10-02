@@ -12,6 +12,7 @@ export interface ChildData {
   gender: 'boy' | 'girl';
   language: string;
   parentName: string;
+  chapterCount: string; // Number of chapters to generate (as string for form handling)
 }
 
 // Story Types
@@ -189,6 +190,7 @@ export interface StoryGenerationRequest {
   gender: 'boy' | 'girl';
   language: string;
   parentName: string;
+  chapterCount: number; // Number of chapters to generate
 }
 
 export interface StoryGenerationResponse {
